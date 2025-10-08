@@ -2,8 +2,8 @@ import TelegramBot from 'node-telegram-bot-api';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Yapılandırma - Environment variables'dan al
-const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || 'TELEGRAM_BOT_TOKEN_BURAYA';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'GEMINI_API_KEY_BURAYA';
 
 // Bot ve AI istemcilerini başlat
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
@@ -25,9 +25,38 @@ function clearConversationHistory(chatId) {
   conversationHistory.set(chatId, []);
 }
 
+// Özel sorulara cevap kontrol et
+function checkSpecialQuestions(message) {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // "Seni kim yaptı" ve benzeri sorular
+  if (lowerMessage.includes('seni kim yaptı') || 
+      lowerMessage.includes('seni kim kodladı') ||
+      lowerMessage.includes('yapımcın kim') ||
+      lowerMessage.includes('sahibin kim') ||
+      lowerMessage.includes('kurucun kim')) {
+    return '👨‍💻 Beni Tarık yaptı! O benim kurucum ve geliştiricim.';
+  }
+  
+  // "Kimsin sen" ve benzeri sorular
+  if (lowerMessage.includes('kimsin') || 
+      lowerMessage.includes('adın ne') ||
+      lowerMessage.includes('ismin ne')) {
+    return '🍳 Ben Menemen! Tarık tarafından yapılmış yapay zeka destekli bir sohbet botuyum. Google Gemini ile çalışıyorum ve her konuda sohbet edebilirim!';
+  }
+  
+  return null; // Özel soru değilse null döndür
+}
+
 // Gemini'den yanıt al
 async function getGeminiResponse(chatId, userMessage) {
   try {
+    // Özel soruları kontrol et
+    const specialAnswer = checkSpecialQuestions(userMessage);
+    if (specialAnswer) {
+      return specialAnswer;
+    }
+    
     // gemini-2.5-flash modelini kullan (en yeni ve hızlı model)
     const model = genAI.getGenerativeModel({ 
       model: 'models/gemini-2.5-flash'
@@ -35,8 +64,11 @@ async function getGeminiResponse(chatId, userMessage) {
 
     const history = getConversationHistory(chatId);
     
+    // Bot kişiliği için sistem prompt'u
+    const systemPrompt = 'Sen Menemen adında yardımsever bir yapay zeka asistandsın. Tarık tarafından yapıldın. Doğal ve arkadaşça konuşursun.\n\n';
+    
     // Geçmişi birleştir
-    let fullPrompt = '';
+    let fullPrompt = systemPrompt;
     if (history.length > 0) {
       // Son 10 mesajı al
       const recentHistory = history.slice(-10);
